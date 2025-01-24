@@ -6,11 +6,14 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from base64 import b64encode
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from urllib.parse import urlencode
 
 
 class ZoomIntegrationAPIView(APIView):
     """
-    A single API to handle:
+    API to handle:
     1. OAuth authorization code exchange.
     2. Fetching ZAK token for the user.
     3. Generating a JWT signature for a meeting.
@@ -79,6 +82,7 @@ class ZoomIntegrationAPIView(APIView):
 
         zak_response = requests.get(zak_url, headers=zak_headers)
 
+
         if zak_response.status_code != 200:
             return Response(
                 {"error": "Failed to retrieve ZAK token.", "details": zak_response.json()},
@@ -120,12 +124,17 @@ class ZoomIntegrationAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-from django.http import JsonResponse
+
 
 def oauth_callback(request):
+    """
+    OAuth callback to handle authorization code and redirect to frontend with the code.
+    """
     authorization_code = request.GET.get("code")
     if not authorization_code:
         return JsonResponse({"error": "Authorization code not provided"}, status=400)
 
-    # Return the authorization code
-    return JsonResponse({"authorization_code": authorization_code}, status=200)
+    # Redirect to frontend with the authorization code
+    frontend_url = ""
+    query_params = urlencode({"authorization_code": authorization_code})
+    return redirect(f"{frontend_url}?{query_params}")
