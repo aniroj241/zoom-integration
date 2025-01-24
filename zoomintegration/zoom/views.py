@@ -123,9 +123,14 @@ class ZoomIntegrationAPIView(APIView):
 from django.http import JsonResponse
 
 def oauth_callback(request):
+    """
+    OAuth callback to handle authorization code and redirect to frontend with the code.
+    """
     authorization_code = request.GET.get("code")
     if not authorization_code:
         return JsonResponse({"error": "Authorization code not provided"}, status=400)
 
-    # Return the authorization code
-    return JsonResponse({"authorization_code": authorization_code}, status=200)
+    # Redirect to frontend with the authorization code
+    frontend_url = ""
+    query_params = urlencode({"authorization_code": authorization_code})
+    return redirect(f"{frontend_url}?{query_params}")
