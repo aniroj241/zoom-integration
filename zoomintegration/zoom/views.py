@@ -1,6 +1,3 @@
-from django.shortcuts import render
-
-# Create your views here.
 import jwt
 import time
 import requests
@@ -9,11 +6,14 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from base64 import b64encode
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from urllib.parse import urlencode
 
 
 class ZoomIntegrationAPIView(APIView):
     """
-    A single API to handle:
+    API to handle:
     1. OAuth authorization code exchange.
     2. Fetching ZAK token for the user.
     3. Generating a JWT signature for a meeting.
@@ -37,15 +37,8 @@ class ZoomIntegrationAPIView(APIView):
         # Step 1: Exchange Authorization Code for Access Token
         client_id = settings.ZOOM_CLIENT_ID
         client_secret = settings.ZOOM_CLIENT_SECRET
-        if not client_id or not client_secret:
-            return Response(
-                {"error": "Missing Zoom client ID or client secret in settings."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        # Combine client_id and client_secret for encoding
         auth_string = f"{client_id}:{client_secret}"
-        auth_header = b64encode(auth_string.encode()).decode()  # Correct Base64 encoding
+        auth_header = b64encode(auth_string.encode()).decode()
 
         token_url = "https://zoom.us/oauth/token"
         token_data = {
@@ -59,8 +52,8 @@ class ZoomIntegrationAPIView(APIView):
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # Request access token
         token_response = requests.post(token_url, data=token_data, headers=token_headers)
+
         if token_response.status_code != 200:
             return Response(
                 {"error": "Failed to retrieve access token.", "details": token_response.json()},
@@ -88,6 +81,8 @@ class ZoomIntegrationAPIView(APIView):
         zak_headers = {"Authorization": f"Bearer {access_token}"}
 
         zak_response = requests.get(zak_url, headers=zak_headers)
+
+
         if zak_response.status_code != 200:
             return Response(
                 {"error": "Failed to retrieve ZAK token.", "details": zak_response.json()},
@@ -102,8 +97,8 @@ class ZoomIntegrationAPIView(APIView):
 
         # Construct the payload ensuring all values are strings
         payload = {
-            "sdkKey": str(settings.ZOOM_MEETING_SDK_KEY),
-            "appKey": str(settings.ZOOM_MEETING_SDK_KEY),
+            "sdkKey": str(settings.ZOOM_CLIENT_ID),
+            "appKey": str(settings.ZOOM_CLIENT_ID),
             "mn": str(meeting_number),  # Ensure meeting number is a string
             "role": str(role),  # Ensure role is a string
             "iat": iat,  # No need to convert iat; it's an integer timestamp
@@ -115,7 +110,7 @@ class ZoomIntegrationAPIView(APIView):
             # Ensure the secret is a valid string
             jwt_signature = jwt.encode(
                 payload,
-                str(settings.ZOOM_MEETING_SDK_SECRET),  # Ensure the secret is a string
+                str(settings.ZOOM_CLIENT_SECRET),  # Ensure the secret is a string
                 algorithm="HS256",
             )
         except Exception as e:
@@ -133,8 +128,6 @@ class ZoomIntegrationAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
-
-from django.http import JsonResponse
 
 def oauth_callback(request):
     authorization_code = request.GET.get("code")
